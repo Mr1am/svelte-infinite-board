@@ -10,6 +10,9 @@
 		wheel?: WheelOptions;
 		inertiaFriction?: number;
 		inertiaEnd?: () => any;
+		mousePan?: boolean;
+		singleTouchPan?: boolean;
+		doubleTouchPan?: boolean;
 		lowerScaleRubber?: (over: number) => number;
 		higherScaleRubber?: (over: number) => number;
 		scaleEnd?: (scale: number) => any;
@@ -22,7 +25,18 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import Background from './Background.svelte';
-	import { clamp, rubber } from './utils.js';
+	import {
+		velocity,
+		drag,
+		zoomAnchor,
+		pinch,
+		scaling,
+		clamp,
+		rubber,
+		type View,
+		setupPinch,
+		stopScaleSpring
+	} from '$lib/index.js';
 
 	let {
 		x = $bindable(0),
@@ -36,6 +50,9 @@
 		higherScaleRubber = (over) => rubber(over, 0.75, 0.65),
 		inertiaEnd = () => {},
 		scaleEnd = () => {},
+		doubleTouchPan = true,
+		singleTouchPan = true,
+		mousePan = true,
 		bgScopes = [
 			{
 				scale: 1,
@@ -47,6 +64,10 @@
 		children,
 		...rest
 	}: Props = $props();
+
+	export function view(): View {
+		return { x, y, scale };
+	}
 
 	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
 	let wheel = $derived({ momentumFactor: 1, speed: 0.0135, ...wheelDefault });
@@ -61,79 +82,41 @@
 
 	let board: HTMLElement | null = $state(null);
 
-	let drag = {
-		happens: false,
-		startX: 0,
-		startY: 0,
-		lastX: 0,
-		lastY: 0
-	};
-
-	let velocity = {
-		x: 0,
-		y: 0
-	};
-
-	let zoomAnchor = {
-		x: 0,
-		y: 0
-	};
-
-	let pinch = {
-		distance: 0,
-		scale: 1,
-		centerX: 0,
-		centerY: 0,
-		offsetX: 0,
-		offsetY: 0
-	};
-
 	let animationFrame = 0;
 
-	let targetScale = scale;
-
-	let scaleVelocity = 0;
-	let scaleSpringFrame: number | null = null;
-
-	function stopScaleSpring() {
-		if (scaleSpringFrame) {
-			cancelAnimationFrame(scaleSpringFrame);
-			scaleSpringFrame = null;
-		}
-		scaleVelocity = 0;
-	}
+	scaling.target = scale;
 
 	function startScaleSpring() {
-		if (scaleSpringFrame) cancelAnimationFrame(scaleSpringFrame);
+		if (scaling.frame) cancelAnimationFrame(scaling.frame);
 
 		function step() {
-			const diff = targetScale - scale;
-			scaleVelocity += diff * zoom.stiffness;
-			scaleVelocity *= zoom.damping;
+			const diff = scaling.target - scale;
+			scaling.velocity += diff * zoom.stiffness;
+			scaling.velocity *= zoom.damping;
 
 			const prevScale = scale;
-			const nextScale = prevScale + scaleVelocity;
+			const nextScale = prevScale + scaling.velocity;
 			const factor = prevScale !== 0 ? nextScale / prevScale : 1;
 
 			x = zoomAnchor.x - (zoomAnchor.x - x) * factor;
 			y = zoomAnchor.y - (zoomAnchor.y - y) * factor;
 			scale = nextScale;
 
-			if (Math.abs(diff) < 0.0001 && Math.abs(scaleVelocity) < 0.0001) {
-				const finalFactor = targetScale / scale || 1;
+			if (Math.abs(diff) < 0.0001 && Math.abs(scaling.velocity) < 0.0001) {
+				const finalFactor = scaling.target / scale || 1;
 				x = zoomAnchor.x - (zoomAnchor.x - x) * finalFactor;
 				y = zoomAnchor.y - (zoomAnchor.y - y) * finalFactor;
-				scale = targetScale;
-				scaleVelocity = 0;
-				scaleSpringFrame = null;
+				scale = scaling.target;
+				scaling.velocity = 0;
+				scaling.frame = null;
 				scaleEnd(scale);
 				return;
 			}
 
-			scaleSpringFrame = requestAnimationFrame(step);
+			scaling.frame = requestAnimationFrame(step);
 		}
 
-		scaleSpringFrame = requestAnimationFrame(step);
+		scaling.frame = requestAnimationFrame(step);
 	}
 
 	function animateInertia() {
@@ -201,9 +184,9 @@
 			x = mx - (mx - x) * realFactor;
 			y = my - (my - y) * realFactor;
 
-			targetScale = clamp(requestedFull, scaleBounds.min, scaleBounds.max);
+			scaling.target = clamp(requestedFull, scaleBounds.min, scaleBounds.max);
 
-			scaleVelocity += deltaScale * zoom.kick;
+			scaling.velocity += deltaScale * zoom.kick;
 
 			startScaleSpring();
 		} else {
@@ -221,6 +204,8 @@
 	}
 
 	function handleMouseDown(e: MouseEvent) {
+		if (!mousePan) return;
+
 		drag.happens = true;
 		drag.startX = e.clientX - x;
 		drag.startY = e.clientY - y;
@@ -249,21 +234,8 @@
 		animateInertia();
 	}
 
-	function setPinchCenterAndOffsets(t1: Touch, t2: Touch) {
-		const rect = board!.getBoundingClientRect();
-		pinch.centerX = (t1.clientX + t2.clientX) / 2 - rect.left;
-		pinch.centerY = (t1.clientY + t2.clientY) / 2 - rect.top;
-		pinch.offsetX = x;
-		pinch.offsetY = y;
-
-		if (scaleVelocity < 0.0001) {
-			zoomAnchor.x = pinch.centerX;
-			zoomAnchor.y = pinch.centerY;
-		}
-	}
-
 	function handleTouchStart(e: TouchEvent) {
-		if (e.touches.length === 1) {
+		if (e.touches.length === 1 && singleTouchPan) {
 			drag.happens = true;
 			drag.startX = e.touches[0].clientX - x;
 			drag.startY = e.touches[0].clientY - y;
@@ -272,13 +244,13 @@
 			velocity.x = 0;
 			velocity.y = 0;
 			cancelAnimationFrame(animationFrame);
-		} else if (e.touches.length === 2) {
+		} else if (e.touches.length === 2 && doubleTouchPan) {
 			drag.happens = false;
 			stopScaleSpring();
 			const [t1, t2] = [e.touches[0], e.touches[1]];
 			pinch.distance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 			pinch.scale = scale;
-			setPinchCenterAndOffsets(t1, t2);
+			setupPinch(t1, t2, board!.getBoundingClientRect(), view());
 			drag.startX = (t1.clientX + t2.clientX) / 2;
 			drag.startY = (t1.clientY + t2.clientY) / 2;
 		}
@@ -318,14 +290,14 @@
 			x = newViewX + dx;
 			y = newViewY + dy;
 			scale = requested;
-			targetScale = clamp(scale, scaleBounds.min, scaleBounds.max);
+			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
 		}
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
 		if (e.touches.length === 0) {
 			drag.happens = false;
-			targetScale = clamp(scale, scaleBounds.min, scaleBounds.max);
+			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
 			startScaleSpring();
 			animateInertia();
 		} else if (e.touches.length === 1) {
@@ -341,7 +313,7 @@
 
 	onDestroy(() => {
 		if (animationFrame) cancelAnimationFrame(animationFrame);
-		if (scaleSpringFrame) cancelAnimationFrame(scaleSpringFrame);
+		if (scaling.frame) cancelAnimationFrame(scaling.frame);
 	});
 </script>
 

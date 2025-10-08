@@ -15,3 +15,42 @@ export interface WheelOptions {
 	momentumFactor?: number;
 	speed?: number;
 }
+
+export interface Velocity {
+	x: number;
+	y: number;
+}
+
+export interface Drag {
+	happens: boolean;
+	startX: number;
+	startY: number;
+	lastX: number;
+	lastY: number;
+}
+
+export interface ZoomAnchor {
+	x: number;
+	y: number;
+}
+
+export interface Pinch {
+	distance: number;
+	scale: number;
+	centerX: number;
+	centerY: number;
+	offsetX: number;
+	offsetY: number;
+}
+
+export interface Scaling {
+	target: number,
+	velocity: number,
+	frame: null | number
+}
+
+export interface View {
+	x: number;
+	y: number;
+	scale: number;
+}
