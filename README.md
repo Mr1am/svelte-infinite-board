@@ -15,6 +15,12 @@
 - lightweight
 - highly customizable
 
+### New in 0.0.3
+- board events (e.g. onPanStart, onWheel)
+- disable pan/zoom
+- getContext for position and scale: getContext('view')();
+- correct zoom handling with UI
+
 ### Roadmap
 
 - [ ] Documentation

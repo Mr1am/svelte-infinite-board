@@ -9,13 +9,17 @@
 		zoom?: ZoomOptions;
 		wheel?: WheelOptions;
 		inertiaFriction?: number;
-		inertiaEnd?: () => any;
+		onInertiaEnd?: () => any;
+		onScaleEnd?: (scale: number) => any;
+		onWheel?: (e: WheelEvent) => any;
+		onPanStart?: (e: MouseEvent | TouchEvent) => any;
+		onPan?: (e: MouseEvent | TouchEvent) => any;
+		onPanEnd?: (e?: TouchEvent) => any;
 		mousePan?: boolean;
 		singleTouchPan?: boolean;
 		doubleTouchPan?: boolean;
 		lowerScaleRubber?: (over: number) => number;
 		higherScaleRubber?: (over: number) => number;
-		scaleEnd?: (scale: number) => any;
 		bgScopes?: import('./Background.svelte').Scope[];
 		bgFadeDuration?: number;
 		children?: import('svelte').Snippet;
@@ -23,20 +27,19 @@
 </script>
 
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import Background from './Background.svelte';
 	import {
-		velocity,
-		drag,
-		zoomAnchor,
-		pinch,
-		scaling,
+		createVelocity,
+		createDrag,
+		createZoomAnchor,
+		createPinch,
+		createScaling,
 		clamp,
 		rubber,
 		type View,
 		setupPinch,
-		stopScaleSpring
 	} from '$lib/index.js';
+	import { setContext } from 'svelte';
 
 	let {
 		x = $bindable(0),
@@ -46,10 +49,14 @@
 		wheel: wheelDefault,
 		zoom: zoomDefault,
 		inertiaFriction = 0.92,
-		lowerScaleRubber = (over) => rubber(over, 0.2, 0.1),
+		lowerScaleRubber = (over) => rubber(over, 0.75, 0.3),
 		higherScaleRubber = (over) => rubber(over, 0.75, 0.65),
-		inertiaEnd = () => {},
-		scaleEnd = () => {},
+		onInertiaEnd = () => {},
+		onScaleEnd = () => {},
+		onWheel = () => {},
+		onPanStart = () => {},
+		onPan = () => {},
+		onPanEnd = () => {},
 		doubleTouchPan = true,
 		singleTouchPan = true,
 		mousePan = true,
@@ -65,9 +72,15 @@
 		...rest
 	}: Props = $props();
 
-	export function view(): View {
-		return { x, y, scale };
-	}
+	const { pinch, setPinch } = createPinch();
+	const { drag, setDrag } = createDrag();
+	const { scaling, setScaling, stopScaling } = createScaling({ target: scale });
+	const { zoomAnchor, setZoomAnchor } = createZoomAnchor();
+	const { velocity, setVelocity } = createVelocity();
+
+	const view: View = $derived({ x, y, scale });
+
+	setContext('view', () => view);
 
 	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
 	let wheel = $derived({ momentumFactor: 1, speed: 0.0135, ...wheelDefault });
@@ -83,8 +96,6 @@
 	let board: HTMLElement | null = $state(null);
 
 	let animationFrame = 0;
-
-	scaling.target = scale;
 
 	function startScaleSpring() {
 		if (scaling.frame) cancelAnimationFrame(scaling.frame);
@@ -107,9 +118,8 @@
 				x = zoomAnchor.x - (zoomAnchor.x - x) * finalFactor;
 				y = zoomAnchor.y - (zoomAnchor.y - y) * finalFactor;
 				scale = scaling.target;
-				scaling.velocity = 0;
-				scaling.frame = null;
-				scaleEnd(scale);
+				setScaling({ velocity: 0, frame: null });
+				onScaleEnd(scale);
 				return;
 			}
 
@@ -132,18 +142,56 @@
 			if (Math.abs(velocity.x) > 0.001 || Math.abs(velocity.y) > 0.001) {
 				animationFrame = requestAnimationFrame(step);
 			} else {
-				velocity.x = 0;
-				velocity.y = 0;
+				setVelocity({ x: 0, y: 0 });
 				animationFrame = 0;
-				inertiaEnd();
+				onInertiaEnd();
 			}
 		}
 
 		animationFrame = requestAnimationFrame(step);
 	}
 
+	function isBoardUnderEvent(e: Event) {
+		if (!board) return false;
+
+		const path = (e as any).composedPath?.();
+		if (Array.isArray(path) && path.length) {
+			if (path.includes(board)) return true;
+		}
+
+		let x: number | null = null;
+		let y: number | null = null;
+
+		if (e instanceof WheelEvent || e instanceof MouseEvent) {
+			x = e.clientX;
+			y = e.clientY;
+		} else if (e instanceof TouchEvent) {
+			const t = e.touches[0] || e.changedTouches[0];
+			if (!t) return false;
+			x = t.clientX;
+			y = t.clientY;
+		}
+
+		if (x == null || y == null) return false;
+
+		if (typeof document.elementsFromPoint === 'function') {
+			const els = document.elementsFromPoint(x, y);
+			if (els.includes(board)) return true;
+			for (const el of els) {
+				if (board.contains(el)) return true;
+			}
+		} else {
+			return board.contains(document.elementFromPoint(x, y) as Node);
+		}
+
+		return false;
+	}
+
 	function handleWheel(e: WheelEvent) {
 		e.preventDefault();
+
+		if (!isBoardUnderEvent(e)) return;
+
 		const deltaX =
 			(e.deltaMode === 1 ? e.deltaX : e.deltaX) * 0.12 * Math.max(1, Math.min(1.75, 1 / scale));
 		const deltaY =
@@ -154,8 +202,7 @@
 			const mx = e.clientX - rect.left;
 			const my = e.clientY - rect.top;
 
-			zoomAnchor.x = mx;
-			zoomAnchor.y = my;
+			setZoomAnchor({ x: mx, y: my});
 
 			const factor = Math.exp(
 				-deltaY /
@@ -184,76 +231,96 @@
 			x = mx - (mx - x) * realFactor;
 			y = my - (my - y) * realFactor;
 
-			scaling.target = clamp(requestedFull, scaleBounds.min, scaleBounds.max);
-
-			scaling.velocity += deltaScale * zoom.kick;
+			setScaling({
+				target: clamp(requestedFull, scaleBounds.min, scaleBounds.max),
+				velocity: (scaling.velocity += deltaScale * zoom.kick)
+			});
 
 			startScaleSpring();
 		} else {
+			const applyVelocity = (value: number, delta: number) =>
+				value * (1 - wheel.momentumFactor) + -delta * wheel.momentumFactor;
+
 			if (e.shiftKey) {
 				x -= deltaX;
-				velocity.x = velocity.x * (1 - wheel.momentumFactor) + -deltaY * wheel.momentumFactor;
+
+				velocity.x = applyVelocity(velocity.x, deltaY);
 			} else {
 				x -= deltaX;
 				y -= deltaY;
-				velocity.x = velocity.x * (1 - wheel.momentumFactor) + -deltaX * wheel.momentumFactor;
-				velocity.y = velocity.y * (1 - wheel.momentumFactor) + -deltaY * wheel.momentumFactor;
+				velocity.x = applyVelocity(velocity.x, deltaX);
+				velocity.y = applyVelocity(velocity.y, deltaY);
 			}
 			animateInertia();
 		}
+
+		onWheel(e);
 	}
 
 	function handleMouseDown(e: MouseEvent) {
 		if (!mousePan) return;
-
-		drag.happens = true;
-		drag.startX = e.clientX - x;
-		drag.startY = e.clientY - y;
-		drag.lastX = e.clientX;
-		drag.lastY = e.clientY;
+		if (!isBoardUnderEvent(e)) return;
+		setDrag({
+			happens: true,
+			startX: e.clientX - x,
+			startY: e.clientY - y,
+			lastX: e.clientX,
+			lastY: e.clientY
+		});
 		velocity.x = 0;
 		velocity.y = 0;
 		cancelAnimationFrame(animationFrame);
 		board && (board.style.cursor = 'grabbing');
+
+		onPanStart(e);
 	}
 
-	function handleMouseMove(e: MouseEvent) {
+	function handleMouseMove(event: MouseEvent) {
 		if (!drag.happens) return;
-		velocity.x = e.clientX - drag.lastX;
-		velocity.y = e.clientY - drag.lastY;
-		drag.lastX = e.clientX;
-		drag.lastY = e.clientY;
+		velocity.x = event.clientX - drag.lastX;
+		velocity.y = event.clientY - drag.lastY;
+		setDrag({ lastX: event.clientX, lastY: event.clientY });
 
-		x = e.clientX - drag.startX;
-		y = e.clientY - drag.startY;
+		x = event.clientX - drag.startX;
+		y = event.clientY - drag.startY;
+
+		onPan(event);
 	}
 
 	function handleMouseUp() {
 		drag.happens = false;
 		board && (board.style.cursor = 'grab');
 		animateInertia();
+		onPanEnd();
 	}
 
 	function handleTouchStart(e: TouchEvent) {
+		if (!isBoardUnderEvent(e)) return;
+
 		if (e.touches.length === 1 && singleTouchPan) {
-			drag.happens = true;
-			drag.startX = e.touches[0].clientX - x;
-			drag.startY = e.touches[0].clientY - y;
-			drag.lastX = e.touches[0].clientX;
-			drag.lastY = e.touches[0].clientY;
-			velocity.x = 0;
-			velocity.y = 0;
+			setDrag({
+				happens: true,
+				startX: e.touches[0].clientX - x,
+				startY: e.touches[0].clientY - y,
+				lastX: e.touches[0].clientX,
+				lastY: e.touches[0].clientY
+			});
+			setVelocity({ x: 0, y: 0 });
 			cancelAnimationFrame(animationFrame);
 		} else if (e.touches.length === 2 && doubleTouchPan) {
-			drag.happens = false;
-			stopScaleSpring();
+			if (!board) return;
+
 			const [t1, t2] = [e.touches[0], e.touches[1]];
-			pinch.distance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-			pinch.scale = scale;
-			setupPinch(t1, t2, board!.getBoundingClientRect(), view());
-			drag.startX = (t1.clientX + t2.clientX) / 2;
-			drag.startY = (t1.clientY + t2.clientY) / 2;
+			setDrag({
+				happens: false,
+				startX: (t1.clientX + t2.clientX) / 2,
+				startY: (t1.clientY + t2.clientY) / 2
+			});
+			stopScaling();
+
+			setPinch({ ...setupPinch([t1, t2], board), scale });
 		}
+		onPanStart(e);
 	}
 
 	function handleTouchMove(e: TouchEvent) {
@@ -291,6 +358,7 @@
 			y = newViewY + dy;
 			scale = requested;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
+			onPan(e);
 		}
 	}
 
@@ -301,7 +369,7 @@
 			startScaleSpring();
 			animateInertia();
 		} else if (e.touches.length === 1) {
-			stopScaleSpring();
+			stopScaling();
 			const t = e.touches[0];
 			drag.happens = true;
 			drag.startX = t.clientX - x;
@@ -309,28 +377,36 @@
 			drag.lastX = t.clientX;
 			drag.lastY = t.clientY;
 		}
+		onPanEnd(e);
 	}
 
-	onDestroy(() => {
-		if (animationFrame) cancelAnimationFrame(animationFrame);
-		if (scaling.frame) cancelAnimationFrame(scaling.frame);
+	$effect(() => {
+		window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+		window.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+		window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+
+		return () => {
+			if (animationFrame) cancelAnimationFrame(animationFrame);
+			if (scaling.frame) cancelAnimationFrame(scaling.frame);
+
+			window.removeEventListener('wheel', handleWheel, { capture: true } as any);
+			window.removeEventListener('touchstart', handleTouchStart, { capture: true } as any);
+			window.removeEventListener('touchmove', handleTouchMove, { capture: true } as any);
+		};
 	});
 </script>
 
-<section
-	bind:this={board}
-	onwheel={handleWheel}
+<svelte:body
 	onmousedown={handleMouseDown}
 	onmousemove={handleMouseMove}
 	onmouseup={handleMouseUp}
 	onmouseleave={handleMouseUp}
-	ontouchstart={handleTouchStart}
-	ontouchmove={handleTouchMove}
 	ontouchend={handleTouchEnd}
 	ontouchcancel={handleTouchEnd}
-	{...rest}
->
-	<Background {scale} {x} {y} scopes={bgScopes} fadeDuration={bgFadeDuration}></Background>
+/>
+
+<section bind:this={board} {...rest}>
+	<Background scopes={bgScopes} fadeDuration={bgFadeDuration}></Background>
 	<div style="transform: translate({x}px, {y}px) scale({scale});">
 		{@render children?.()}
 	</div>

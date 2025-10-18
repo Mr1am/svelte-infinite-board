@@ -20,19 +20,14 @@
 
 <script lang="ts">
 	import { fade } from 'svelte/transition';
+	import { getContext } from 'svelte';
 	interface Props {
-		scale?: number;
-		x?: number;
-		y?: number;
 		scopes?: Scope[];
 		fadeDuration?: number;
 		children?: import('svelte').Snippet;
 	}
 
 	let {
-		scale = 1,
-		x = 0,
-		y = 0,
 		scopes = [
 			{
 				scale: 1,
@@ -43,21 +38,22 @@
 		fadeDuration = 400,
 		...rest
 	}: Props = $props();
-
-	let currentScope = $derived(getCurrentScope(scale ?? 1, scopes));
+	const view = $derived(getContext<Function>('view')());
+	let currentScope = $derived(getCurrentScope(view.scale ?? 1, scopes));
 
 	const bgPattern = $derived.by(() => {
 		if (!currentScope.bg) return '';
 		if (currentScope.bg.startsWith('<svg')) return `background-image: ${svgToUri(currentScope.bg)}`;
 		return `background-color: ${currentScope.bg}`;
 	})
-	const bgSize = $derived(scale * (currentScope.size ?? 128));
+	const bgSize = $derived(view.scale * (currentScope.size ?? 128));
+
 </script>
 
 {#key currentScope}
 	<div
 		transition:fade={{ duration: fadeDuration }}
-		style='background-size: {bgSize}px; background-position: {x}px {y}px; {bgPattern}'
+		style='background-size: {bgSize}px; background-position: {view.x}px {view.y}px; {bgPattern}'
 		aria-hidden="true"
 		{...rest}
 	></div>
