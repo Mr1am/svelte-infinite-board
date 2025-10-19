@@ -1,31 +1,3 @@
-<script module lang="ts">
-	import type { ScaleBounds, ZoomOptions, WheelOptions } from './types.js';
-
-	export interface Props {
-		x?: number;
-		y?: number;
-		scale?: number;
-		scaleBounds?: ScaleBounds;
-		zoom?: ZoomOptions;
-		wheel?: WheelOptions;
-		inertiaFriction?: number;
-		onInertiaEnd?: () => any;
-		onScaleEnd?: (scale: number) => any;
-		onWheel?: (e: WheelEvent) => any;
-		onPanStart?: (e: MouseEvent | TouchEvent) => any;
-		onPan?: (e: MouseEvent | TouchEvent) => any;
-		onPanEnd?: (e?: TouchEvent) => any;
-		mousePan?: boolean;
-		singleTouchPan?: boolean;
-		doubleTouchPan?: boolean;
-		lowerScaleRubber?: (over: number) => number;
-		higherScaleRubber?: (over: number) => number;
-		bgScopes?: import('./Background.svelte').Scope[];
-		bgFadeDuration?: number;
-		children?: import('svelte').Snippet;
-	}
-</script>
-
 <script lang="ts">
 	import Background from './Background.svelte';
 	import {
@@ -37,7 +9,7 @@
 		clamp,
 		rubber,
 		type View,
-		setupPinch,
+		setupPinch, type BoardProps, screenToBoardCoords, boardToScreenCoords
 	} from '$lib/index.js';
 	import { setContext } from 'svelte';
 
@@ -67,10 +39,11 @@
 				bg: `#111`
 			}
 		],
-		bgFadeDuration = 400,
+		bgParams = { duration: 400 },
+		board = $bindable(null),
 		children,
 		...rest
-	}: Props = $props();
+	}: BoardProps = $props();
 
 	const { pinch, setPinch } = createPinch();
 	const { drag, setDrag } = createDrag();
@@ -79,6 +52,9 @@
 	const { velocity, setVelocity } = createVelocity();
 
 	const view: View = $derived({ x, y, scale });
+
+	export const screenToBoard = (coords: {x: number; y: number}) => screenToBoardCoords(coords, x, y, scale);
+	export const boardToScreen = (coords: {x: number; y: number}) => boardToScreenCoords(coords, x, y, scale);
 
 	setContext('view', () => view);
 
@@ -92,8 +68,6 @@
 		damping: 0.4,
 		...zoomDefault
 	});
-
-	let board: HTMLElement | null = $state(null);
 
 	let animationFrame = 0;
 
@@ -258,7 +232,10 @@
 	}
 
 	function handleMouseDown(e: MouseEvent) {
-		if (!mousePan) return;
+		if (!mousePan) {
+			onPanStart(e);
+			return;
+		}
 		if (!isBoardUnderEvent(e)) return;
 		setDrag({
 			happens: true,
@@ -287,17 +264,21 @@
 		onPan(event);
 	}
 
-	function handleMouseUp() {
+	function handleMouseUp(event: MouseEvent) {
 		drag.happens = false;
 		board && (board.style.cursor = 'grab');
 		animateInertia();
-		onPanEnd();
+		onPanEnd(event);
 	}
 
 	function handleTouchStart(e: TouchEvent) {
 		if (!isBoardUnderEvent(e)) return;
 
-		if (e.touches.length === 1 && singleTouchPan) {
+		if (e.touches.length === 1) {
+			if (!singleTouchPan) {
+				onPanStart(e);
+				return;
+			}
 			setDrag({
 				happens: true,
 				startX: e.touches[0].clientX - x,
@@ -307,7 +288,11 @@
 			});
 			setVelocity({ x: 0, y: 0 });
 			cancelAnimationFrame(animationFrame);
-		} else if (e.touches.length === 2 && doubleTouchPan) {
+		} else if (e.touches.length === 2) {
+			if (!doubleTouchPan) {
+				onPanStart(e);
+				return;
+			}
 			if (!board) return;
 
 			const [t1, t2] = [e.touches[0], e.touches[1]];
@@ -320,6 +305,7 @@
 
 			setPinch({ ...setupPinch([t1, t2], board), scale });
 		}
+
 		onPanStart(e);
 	}
 
@@ -406,7 +392,7 @@
 />
 
 <section bind:this={board} {...rest}>
-	<Background scopes={bgScopes} fadeDuration={bgFadeDuration}></Background>
+	<Background scopes={bgScopes} {bgParams}></Background>
 	<div style="transform: translate({x}px, {y}px) scale({scale});">
 		{@render children?.()}
 	</div>

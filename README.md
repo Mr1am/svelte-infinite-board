@@ -1,25 +1,21 @@
-<div style="display: flex; flex-direction: column; width: 100%; align-items: center">
-<h1> Svelte Infinite Board </h1>
+<h1 align="center"> Svelte Infinite Board </h1>
 
 [![npm](https://img.shields.io/npm/v/svelte-infinite-board)](https://www.npmjs.com/package/svelte-infinite-board)
 [![license](https://img.shields.io/npm/l/svelte-infinite-board)](https://www.npmjs.com/package/svelte-infinite-board)
 
-<b> In early development</b>
-
-</div>
+<b> In development</b>
 
 ### Features
 
 - smooth pan & zoom
 - full mobile support
 - lightweight
-- highly customizable
+- customization
 
-### New in 0.0.3
-- board events (e.g. onPanStart, onWheel)
-- disable pan/zoom
-- getContext for position and scale: getContext('view')();
-- correct zoom handling with UI
+### New in 0.0.4
+- board binding
+- events now trigger even when pan disabled
+- screenToBoard & boardToScreen convert functions
 
 ### Roadmap
 
