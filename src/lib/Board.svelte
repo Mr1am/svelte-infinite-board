@@ -307,8 +307,11 @@
 				startY: (t1.clientY + t2.clientY) / 2
 			});
 			stopScaling();
+			stopScaling();
 
-			setPinch({ ...setupPinch([t1, t2], board), scale });
+			setPinch({ ...setupPinch([t1, t2], board), scale, offsetX: x, offsetY: y });
+
+			if (scaling.velocity < 0.0001) setZoomAnchor({ x: pinch.centerX, y: pinch.centerY });
 		}
 
 		onPanStart(e);
