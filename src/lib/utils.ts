@@ -12,12 +12,12 @@ export function rubber(over: number, exponent: number = 0.25, stretch: number = 
 
 export function setupPinch(touches: Touch[], element: HTMLElement) {
 	const rect = element!.getBoundingClientRect();
-	const x = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
-	const y = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
+	const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+	const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
 
 	const distance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
 
-	return { x, y, distance };
+	return { centerX, centerY, distance };
 }
 
 export const svgToUri = (svg: string) =>

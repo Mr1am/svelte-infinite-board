@@ -9,7 +9,10 @@
 		clamp,
 		rubber,
 		type View,
-		setupPinch, type BoardProps, screenToBoardCoords, boardToScreenCoords
+		setupPinch,
+		type BoardProps,
+		screenToBoardCoords,
+		boardToScreenCoords
 	} from '$lib/index.js';
 	import { setContext } from 'svelte';
 
@@ -53,8 +56,10 @@
 
 	const view: View = $derived({ x, y, scale });
 
-	export const screenToBoard = (coords: {x: number; y: number}) => screenToBoardCoords(coords, x, y, scale);
-	export const boardToScreen = (coords: {x: number; y: number}) => boardToScreenCoords(coords, x, y, scale);
+	export const screenToBoard = (coords: { x: number; y: number }) =>
+		screenToBoardCoords(coords, x, y, scale);
+	export const boardToScreen = (coords: { x: number; y: number }) =>
+		boardToScreenCoords(coords, x, y, scale);
 
 	setContext('view', () => view);
 
@@ -176,7 +181,7 @@
 			const mx = e.clientX - rect.left;
 			const my = e.clientY - rect.top;
 
-			setZoomAnchor({ x: mx, y: my});
+			setZoomAnchor({ x: mx, y: my });
 
 			const factor = Math.exp(
 				-deltaY /
@@ -357,11 +362,13 @@
 		} else if (e.touches.length === 1) {
 			stopScaling();
 			const t = e.touches[0];
-			drag.happens = true;
-			drag.startX = t.clientX - x;
-			drag.startY = t.clientY - y;
-			drag.lastX = t.clientX;
-			drag.lastY = t.clientY;
+			setDrag({
+				happens: false,
+				startX: t.clientX - x,
+				startY: t.clientY - y,
+				lastX: t.clientX,
+				lastY: t.clientY
+			});
 		}
 		onPanEnd(e);
 	}
