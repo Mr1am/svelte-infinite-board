@@ -83,6 +83,7 @@
 		color: white;
 		font-family: sans-serif;
 		user-select: none;
+		background: black;
 	}
 
 	div {
