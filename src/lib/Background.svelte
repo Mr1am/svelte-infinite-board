@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { fade, type FadeParams } from 'svelte/transition';
-	import { getContext } from 'svelte';
 	import { getCurrentScope, svgToUri, type BgScope } from '$lib/utils.js';
 	interface Props {
 		scopes?: BgScope[];
 		bgParams?: FadeParams;
+		x: number;
+		y: number;
+		scale: number;
 		children?: import('svelte').Snippet;
 	}
 
@@ -17,9 +19,11 @@
 			}
 		],
 		bgParams = { duration: 400 },
+		x,
+		y,
+		scale,
 		...rest
 	}: Props = $props();
-	const { x, y, scale } = $derived(getContext<Function>('view')());
 	let currentScope = $derived(getCurrentScope(scale ?? 1, scopes));
 
 	const bgPattern = $derived.by(() => {

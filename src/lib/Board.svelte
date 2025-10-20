@@ -249,8 +249,7 @@
 			lastX: e.clientX,
 			lastY: e.clientY
 		});
-		velocity.x = 0;
-		velocity.y = 0;
+		setVelocity({ x: 0, y: 0 });
 		cancelAnimationFrame(animationFrame);
 		board && (board.style.cursor = 'grabbing');
 
@@ -402,7 +401,7 @@
 />
 
 <section bind:this={board} {...rest}>
-	<Background scopes={bgScopes} {bgParams}></Background>
+	<Background scopes={bgScopes} {bgParams} {x} {y} {scale}></Background>
 	<div style="transform: translate({x}px, {y}px) scale({scale});">
 		{@render children?.()}
 	</div>
