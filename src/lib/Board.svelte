@@ -14,7 +14,7 @@
 		screenToBoardCoords,
 		boardToScreenCoords
 	} from '$lib/index.js';
-	import { setContext } from 'svelte';
+
 
 	let {
 		x = $bindable(0),
@@ -61,7 +61,6 @@
 	export const boardToScreen = (coords: { x: number; y: number }) =>
 		boardToScreenCoords(coords, x, y, scale);
 
-	setContext('view', () => view);
 
 	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
 	let wheel = $derived({ momentumFactor: 1, speed: 0.0135, ...wheelDefault });
