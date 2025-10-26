@@ -35,6 +35,9 @@ importers:
       svelte-check:
         specifier: ^4.3.2
         version: 4.3.2(picomatch@4.0.3)(svelte@5.39.8)(typescript@5.9.3)
+      svelte-fancy-transitions:
+        specifier: ^0.0.7
+        version: 0.0.7
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -558,6 +561,9 @@ packages:
       svelte: ^4.0.0 || ^5.0.0-next.0
       typescript: '>=5.0.0'
 
+  svelte-fancy-transitions@0.0.7:
+    resolution: {integrity: sha512-TQevQDFLeSErBUC6LZW3W4yce8Gkh00kpQyoJ0LD0TLrusnCT0H7PZ7Zi0b+9PgT7Gc8bGUzINiQ9uTql5e3xQ==}
+
   svelte2tsx@0.7.44:
     resolution: {integrity: sha512-opuH+bCboss0/ncxnfAO+qt0IAprxc8OqwuC7otafWeO5CHjJ6UAAwvQmu/+xjpCSarX8pQKydXQuoJmbCDcTg==}
     peerDependencies:
@@ -1042,6 +1048,8 @@ snapshots:
       typescript: 5.9.3
     transitivePeerDependencies:
       - picomatch
+
+  svelte-fancy-transitions@0.0.7: {}
 
   svelte2tsx@0.7.44(svelte@5.39.8)(typescript@5.9.3):
     dependencies:

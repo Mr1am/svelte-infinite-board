@@ -12,9 +12,9 @@
 		setupPinch,
 		type BoardProps,
 		screenToBoardCoords,
-		boardToScreenCoords
+		boardToScreenCoords,
+		isBoardUnderEvent
 	} from '$lib/index.js';
-
 
 	let {
 		x = $bindable(0),
@@ -26,8 +26,8 @@
 		inertiaFriction = 0.92,
 		lowerScaleRubber = (over) => rubber(over, 0.75, 0.3),
 		higherScaleRubber = (over) => rubber(over, 0.75, 0.65),
-		onInertiaEnd = () => {},
-		onScaleEnd = () => {},
+		onInertiaEnd: onInertiaEnds = () => {},
+		onScaleEnd: onScaleEnds = () => {},
 		onWheel = () => {},
 		onPanStart = () => {},
 		onPan = () => {},
@@ -48,22 +48,6 @@
 		...rest
 	}: BoardProps = $props();
 
-	const { pinch, setPinch } = createPinch();
-	const { drag, setDrag } = createDrag();
-	const { scaling, setScaling, stopScaling } = createScaling({ target: scale });
-	const { zoomAnchor, setZoomAnchor } = createZoomAnchor();
-	const { velocity, setVelocity } = createVelocity();
-
-	const view: View = $derived({ x, y, scale });
-
-	export const screenToBoard = (coords: { x: number; y: number }) =>
-		screenToBoardCoords(coords, x, y, scale);
-	export const boardToScreen = (coords: { x: number; y: number }) =>
-		boardToScreenCoords(coords, x, y, scale);
-
-
-	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
-	let wheel = $derived({ momentumFactor: 1, speed: 0.0135, ...wheelDefault });
 	let zoom = $derived({
 		immediateBlend: 0,
 		kick: 0.25,
@@ -73,102 +57,73 @@
 		...zoomDefault
 	});
 
-	let animationFrame = 0;
+	const { pinch, setPinch } = createPinch();
+	const { drag, setDrag } = createDrag();
+	export const { scaling, setScaling, stopScaling, onScale, onScaleEnd } = createScaling(
+		scale,
+		0,
+		0,
+		zoom.stiffness,
+		zoom.damping
+	);
+	const { zoomAnchor, setZoomAnchor } = createZoomAnchor();
+	export const { velocity, setVelocity, cancelVelocity, inertia, onInertia, onInertiaEnd } = createVelocity(
+		0,
+		0,
+		inertiaFriction
+	);
 
-	function startScaleSpring() {
-		if (scaling.frame) cancelAnimationFrame(scaling.frame);
+	export const view = (): View => {
+		return { x, y, scale };
+	};
 
-		function step() {
-			const diff = scaling.target - scale;
-			scaling.velocity += diff * zoom.stiffness;
-			scaling.velocity *= zoom.damping;
+	export const screenToBoard = (coords: { x: number; y: number }) =>
+		screenToBoardCoords(coords, x, y, scale);
+	export const boardToScreen = (coords: { x: number; y: number }) =>
+		boardToScreenCoords(coords, x, y, scale);
 
-			const prevScale = scale;
-			const nextScale = prevScale + scaling.velocity;
-			const factor = prevScale !== 0 ? nextScale / prevScale : 1;
-
-			x = zoomAnchor.x - (zoomAnchor.x - x) * factor;
-			y = zoomAnchor.y - (zoomAnchor.y - y) * factor;
-			scale = nextScale;
-
-			if (Math.abs(diff) < 0.0001 && Math.abs(scaling.velocity) < 0.0001) {
-				const finalFactor = scaling.target / scale || 1;
-				x = zoomAnchor.x - (zoomAnchor.x - x) * finalFactor;
-				y = zoomAnchor.y - (zoomAnchor.y - y) * finalFactor;
-				scale = scaling.target;
-				setScaling({ velocity: 0, frame: null });
-				onScaleEnd(scale);
-				return;
-			}
-
-			scaling.frame = requestAnimationFrame(step);
-		}
-
-		scaling.frame = requestAnimationFrame(step);
+	export function getEventPosition(e: MouseEvent | TouchEvent): { x: number; y: number } {
+		if (e instanceof MouseEvent) return { x: e.clientX, y: e.clientY };
+		const touch = e.touches[0] || e.changedTouches[0];
+		return { x: touch.clientX, y: touch.clientY };
 	}
 
-	function animateInertia() {
-		if (animationFrame) cancelAnimationFrame(animationFrame);
+	onInertia(() => {
+		x += velocity.x;
+		y += velocity.y;
+	});
 
-		function step() {
-			x += velocity.x;
-			y += velocity.y;
+	onInertiaEnd(() => onInertiaEnds());
 
-			velocity.x *= inertiaFriction;
-			velocity.y *= inertiaFriction;
+	onScale(() => {
+		const prevScale = scale;
+		const nextScale = prevScale + scaling.velocity;
+		const factor = prevScale !== 0 ? nextScale / prevScale : 1;
 
-			if (Math.abs(velocity.x) > 0.001 || Math.abs(velocity.y) > 0.001) {
-				animationFrame = requestAnimationFrame(step);
-			} else {
-				setVelocity({ x: 0, y: 0 });
-				animationFrame = 0;
-				onInertiaEnd();
-			}
-		}
+		x = zoomAnchor.x - (zoomAnchor.x - x) * factor;
+		y = zoomAnchor.y - (zoomAnchor.y - y) * factor;
+		scale = nextScale;
+	});
 
-		animationFrame = requestAnimationFrame(step);
-	}
+	onScaleEnd(() => {
+		const finalFactor = scaling.target / scaling.current || 1;
+		x = zoomAnchor.x - (zoomAnchor.x - x) * finalFactor;
+		y = zoomAnchor.y - (zoomAnchor.y - y) * finalFactor;
 
-	function isBoardUnderEvent(e: Event) {
-		if (!board) return false;
+		onScaleEnds(scale);
+	});
 
-		const path = (e as any).composedPath?.();
-		if (Array.isArray(path) && path.length) {
-			if (path.includes(board)) return true;
-		}
+	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
+	let wheel = $derived({ momentumFactor: 1, speed: 0.0135, ...wheelDefault });
 
-		let x: number | null = null;
-		let y: number | null = null;
-
-		if (e instanceof WheelEvent || e instanceof MouseEvent) {
-			x = e.clientX;
-			y = e.clientY;
-		} else if (e instanceof TouchEvent) {
-			const t = e.touches[0] || e.changedTouches[0];
-			if (!t) return false;
-			x = t.clientX;
-			y = t.clientY;
-		}
-
-		if (x == null || y == null) return false;
-
-		if (typeof document.elementsFromPoint === 'function') {
-			const els = document.elementsFromPoint(x, y);
-			if (els.includes(board)) return true;
-			for (const el of els) {
-				if (board.contains(el)) return true;
-			}
-		} else {
-			return board.contains(document.elementFromPoint(x, y) as Node);
-		}
-
-		return false;
-	}
+	$effect(() => {
+		scaling.current = scale;
+	});
 
 	function handleWheel(e: WheelEvent) {
 		e.preventDefault();
 
-		if (!isBoardUnderEvent(e)) return;
+		if (!isBoardUnderEvent(e, board)) return;
 
 		const deltaX =
 			(e.deltaMode === 1 ? e.deltaX : e.deltaX) * 0.12 * Math.max(1, Math.min(1.75, 1 / scale));
@@ -213,8 +168,6 @@
 				target: clamp(requestedFull, scaleBounds.min, scaleBounds.max),
 				velocity: (scaling.velocity += deltaScale * zoom.kick)
 			});
-
-			startScaleSpring();
 		} else {
 			const applyVelocity = (value: number, delta: number) =>
 				value * (1 - wheel.momentumFactor) + -delta * wheel.momentumFactor;
@@ -226,10 +179,10 @@
 			} else {
 				x -= deltaX;
 				y -= deltaY;
-				velocity.x = applyVelocity(velocity.x, deltaX);
-				velocity.y = applyVelocity(velocity.y, deltaY);
+
+				setVelocity({ x: applyVelocity(velocity.x, deltaX), y: applyVelocity(velocity.y, deltaY) });
 			}
-			animateInertia();
+			inertia();
 		}
 
 		onWheel(e);
@@ -240,7 +193,7 @@
 			onPanStart(e);
 			return;
 		}
-		if (!isBoardUnderEvent(e)) return;
+		if (!isBoardUnderEvent(e, board)) return;
 		setDrag({
 			happens: true,
 			startX: e.clientX - x,
@@ -249,7 +202,7 @@
 			lastY: e.clientY
 		});
 		setVelocity({ x: 0, y: 0 });
-		cancelAnimationFrame(animationFrame);
+		cancelVelocity();
 		board && (board.style.cursor = 'grabbing');
 
 		onPanStart(e);
@@ -257,8 +210,12 @@
 
 	function handleMouseMove(event: MouseEvent) {
 		if (!drag.happens) return;
-		velocity.x = event.clientX - drag.lastX;
-		velocity.y = event.clientY - drag.lastY;
+
+		if (!mousePan) {
+			onPan(event);
+			return;
+		}
+		setVelocity({ x: event.clientX - drag.lastX, y: event.clientY - drag.lastY });
 		setDrag({ lastX: event.clientX, lastY: event.clientY });
 
 		x = event.clientX - drag.startX;
@@ -270,12 +227,12 @@
 	function handleMouseUp(event: MouseEvent) {
 		drag.happens = false;
 		board && (board.style.cursor = 'grab');
-		animateInertia();
+		inertia();
 		onPanEnd(event);
 	}
 
 	function handleTouchStart(e: TouchEvent) {
-		if (!isBoardUnderEvent(e)) return;
+		if (!isBoardUnderEvent(e, board)) return;
 
 		if (e.touches.length === 1) {
 			if (!singleTouchPan) {
@@ -290,7 +247,7 @@
 				lastY: e.touches[0].clientY
 			});
 			setVelocity({ x: 0, y: 0 });
-			cancelAnimationFrame(animationFrame);
+			cancelVelocity();
 		} else if (e.touches.length === 2) {
 			if (!doubleTouchPan) {
 				onPanStart(e);
@@ -305,7 +262,6 @@
 				startY: (t1.clientY + t2.clientY) / 2
 			});
 			stopScaling();
-			stopScaling();
 
 			setPinch({ ...setupPinch([t1, t2], board), scale, offsetX: x, offsetY: y });
 
@@ -317,15 +273,22 @@
 
 	function handleTouchMove(e: TouchEvent) {
 		if (e.touches.length === 1 && drag.happens) {
+			if (!singleTouchPan) {
+				onPan(e);
+				return;
+			}
+
 			const t = e.touches[0];
-			velocity.x = t.clientX - drag.lastX;
-			velocity.y = t.clientY - drag.lastY;
-			drag.lastX = t.clientX;
-			drag.lastY = t.clientY;
+			setVelocity({ x: t.clientX - drag.lastX, y: t.clientY - drag.lastY});
+			setDrag({ lastX: t.clientX, lastY: t.clientY })
 
 			x = t.clientX - drag.startX;
 			y = t.clientY - drag.startY;
 		} else if (e.touches.length === 2) {
+			if (!doubleTouchPan) {
+				onPan(e);
+				return;
+			}
 			const t1 = e.touches[0],
 				t2 = e.touches[1];
 			const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -350,16 +313,15 @@
 			y = newViewY + dy;
 			scale = requested;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
-			onPan(e);
 		}
+		onPan(e);
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
 		if (e.touches.length === 0) {
 			drag.happens = false;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
-			startScaleSpring();
-			animateInertia();
+			inertia();
 		} else if (e.touches.length === 1) {
 			stopScaling();
 			const t = e.touches[0];
@@ -380,9 +342,6 @@
 		window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
 
 		return () => {
-			if (animationFrame) cancelAnimationFrame(animationFrame);
-			if (scaling.frame) cancelAnimationFrame(scaling.frame);
-
 			window.removeEventListener('wheel', handleWheel, { capture: true } as any);
 			window.removeEventListener('touchstart', handleTouchStart, { capture: true } as any);
 			window.removeEventListener('touchmove', handleTouchMove, { capture: true } as any);
@@ -394,12 +353,11 @@
 	onmousedown={handleMouseDown}
 	onmousemove={handleMouseMove}
 	onmouseup={handleMouseUp}
-	onmouseleave={handleMouseUp}
 	ontouchend={handleTouchEnd}
 	ontouchcancel={handleTouchEnd}
 />
 
-<section bind:this={board} {...rest}>
+<section bind:this={board} {...rest} oncontextmenu={(e) => e.preventDefault()}>
 	<Background scopes={bgScopes} {bgParams} {x} {y} {scale}></Background>
 	<div style="transform: translate({x}px, {y}px) scale({scale});">
 		{@render children?.()}

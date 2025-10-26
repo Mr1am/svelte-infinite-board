@@ -50,3 +50,38 @@ export function screenToBoardCoords(coords: {x: number; y: number}, x: number, y
 	};
 }
 
+export function isBoardUnderEvent(e: Event, board: any) {
+	if (!board) return false;
+
+	const path = (e as any).composedPath?.();
+	if (Array.isArray(path) && path.length) {
+		if (path.includes(board)) return true;
+	}
+
+	let x: number | null = null;
+	let y: number | null = null;
+
+	if (e instanceof WheelEvent || e instanceof MouseEvent) {
+		x = e.clientX;
+		y = e.clientY;
+	} else if (e instanceof TouchEvent) {
+		const t = e.touches[0] || e.changedTouches[0];
+		if (!t) return false;
+		x = t.clientX;
+		y = t.clientY;
+	}
+
+	if (x == null || y == null) return false;
+
+	if (typeof document.elementsFromPoint === 'function') {
+		const els = document.elementsFromPoint(x, y);
+		if (els.includes(board)) return true;
+		for (const el of els) {
+			if (board.contains(el)) return true;
+		}
+	} else {
+		return board.contains(document.elementFromPoint(x, y) as Node);
+	}
+
+	return false;
+}

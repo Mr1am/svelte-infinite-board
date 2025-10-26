@@ -23,6 +23,13 @@ export interface Velocity {
 	y: number;
 }
 
+export interface Node {
+	x: number;
+	y: number;
+	w: number;
+	height: number;
+}
+
 export interface Drag {
 	happens: boolean;
 	startX: number;
@@ -49,6 +56,7 @@ export interface Scaling {
 	target: number;
 	velocity: number;
 	frame: null | number;
+	current: number;
 }
 
 export interface View {
