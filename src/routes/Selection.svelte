@@ -39,8 +39,7 @@
 		end?: Position;
 	};
 
-	let longTapTimeout = $state<number | null>(null);
-
+	let vel = new Tween({ x: 0, y: 0 }, { duration: 500 });
 	let autoScrollRaf = $state<number | null>(null);
 
 	$effect(() => {
@@ -74,7 +73,7 @@
 		selecting = true;
 		const pos = board.getEventPosition(e);
 		selection.start = board.screenToBoard(pos);
-		screenSelectionTween = new Tween({ start: selection.start, end: selection.start }, screenSelectionTween);
+		screenSelection = new Tween({ start: selection.start, end: selection.start }, screenSelectionTween);
 		selection.end = selection.start;
 	}
 
@@ -106,7 +105,6 @@
 		if (!selecting) return;
 
 		selecting = false;
-		if (longTapTimeout) clearTimeout(longTapTimeout);
 
 		const result =
 			selection.start && selection.end ? { start: selection.start, end: selection.end } : null;
@@ -117,7 +115,7 @@
 
 		return result;
 	}
-	let vel = new Tween({ x: 0, y: 0 }, { duration: 500 });
+
 	function startAutoScroll(dx: number, dy: number, pos: { x: number; y: number }) {
 		if (autoScrollRaf) return;
 		const speed = scroll.speed ?? 10;
@@ -149,8 +147,8 @@
 
 {#if selecting}
 	<div
-		in:fade|global={{ duration: 150 }}
-		out:flyOut|global={{ duration: 500, reverse: true, scaling: 6, blur: 20 }}
+		in:fade={{ duration: 200 }}
+		out:flyOut={{ duration: 500, reverse: true, scaling: 6, blur: 20 }}
 		{...rest}
 		style="top: {screenSelection.current.start.y}px;
 		width: {screenSelection.current.end.x}px;

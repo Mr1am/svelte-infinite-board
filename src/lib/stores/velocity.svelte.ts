@@ -15,6 +15,11 @@ export function createVelocity(x = 0, y = 0, friction = 0.92) {
 		if (animationFrame) cancelAnimationFrame(animationFrame);
 	}
 
+	const stopVelocity = () => {
+		setVelocity({ x: 0, y: 0 });
+		cancelVelocity();
+	}
+
 	const inertia = () => {
 		cancelVelocity();
 
@@ -40,6 +45,7 @@ export function createVelocity(x = 0, y = 0, friction = 0.92) {
 		velocity,
 		setVelocity,
 		cancelVelocity,
+		stopVelocity,
 		inertia,
 		onInertia(cb: () => void) {
 			onInertiaCallback = cb;

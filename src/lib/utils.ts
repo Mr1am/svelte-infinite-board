@@ -1,4 +1,4 @@
-import type { BgScope } from '$lib/types.js';
+import type { BgScope, ScaleBounds } from '$lib/types.js';
 
 export function clamp(value: number, max: number, min: number) {
 	return Math.min(Math.max(value, max), min);
@@ -15,7 +15,10 @@ export function setupPinch(touches: Touch[], element: HTMLElement) {
 	const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
 	const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
 
-	const distance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+	const distance = Math.hypot(
+		touches[1].clientX - touches[0].clientX,
+		touches[1].clientY - touches[0].clientY
+	);
 
 	return { centerX, centerY, distance };
 }
@@ -36,17 +39,34 @@ export function getCurrentScope(scale: number, list?: BgScope[]) {
 	return pick;
 }
 
-export function boardToScreenCoords(coords: {x: number; y: number}, x: number, y: number, scale: number) {
+export function boardToScreenCoords(
+	coords: { x: number; y: number },
+	x: number,
+	y: number,
+	scale: number
+) {
 	return {
 		x: coords.x * scale + x,
-		y: coords.y * scale + y,
+		y: coords.y * scale + y
 	};
 }
 
-export function screenToBoardCoords(coords: {x: number; y: number}, x: number, y: number, scale: number) {
+export function screenToBoardCoords(
+	coords: { x: number; y: number },
+	x: number,
+	y: number,
+	scale: number
+) {
 	return {
 		x: (coords.x - x) / scale,
-		y: (coords.y - y) / scale,
+		y: (coords.y - y) / scale
+	};
+}
+
+export function setDelta(event: WheelEvent, scale: number) {
+	return {
+		x: (event.deltaMode === 1 ? 2 : 0.12) * event.deltaX * Math.max(1, Math.min(1.75, 1 / scale)),
+		y: (event.deltaMode === 1 ? 2 : 0.12) * event.deltaY * Math.max(1, Math.min(1.75, 1 / scale))
 	};
 }
 
@@ -84,4 +104,51 @@ export function isBoardUnderEvent(e: Event, board: any) {
 	}
 
 	return false;
+}
+
+export function isClick(
+	positions: {start: {x: number; y: number}, end: {x: number; y: number}},
+	threshold: number
+) {
+	const dx = Math.abs(positions.start.x - positions.end.x);
+	const dy = Math.abs(positions.start.y - positions.end.y);
+	const distance = Math.sqrt(dx * dx + dy * dy);
+	return distance < threshold;
+}
+
+export const viewByPinch = (
+	center: number,
+	offset: number,
+	pinchScale: number,
+	requestedScale: number
+) => center - (center - offset) * (requestedScale / pinchScale);
+
+export const dragDelta = (positions: number[], dragStart: number) =>
+	(positions[0] + positions[2]) / 2 - dragStart;
+
+
+/**
+ * Applies rubberbanding to a requested scale value based on the provided bounds.
+ * If the requested scale is below the minimum bound, it applies the lower rubber function.
+ * If above the maximum bound, it applies the higher rubber function.
+ * Handles cases where min or max bounds are undefined (no adjustment in those directions).
+ *
+ * @param {number} requested - The requested scale value.
+ * @param {ScaleBounds} bounds - The scale bounds with optional min and max.
+ * @param {(over: number) => number} lowerScaleRubber - Function to compute lower rubberband offset.
+ * @param {(over: number) => number} higherScaleRubber - Function to compute higher rubberband offset.
+ * @returns {number} The adjusted scale value after applying bounds and rubberbanding.
+ */
+export function applyScaleBounding(
+	requested: number,
+	bounds: ScaleBounds,
+	lowerScaleRubber: (over: number) => number,
+	higherScaleRubber: (over: number) => number
+): number {
+	if (bounds.min !== undefined && requested < bounds.min) {
+		return bounds.min + lowerScaleRubber(requested - bounds.min);
+	} else if (bounds.max !== undefined && requested > bounds.max) {
+		return bounds.max + higherScaleRubber(requested - bounds.max);
+	}
+	return requested;
 }

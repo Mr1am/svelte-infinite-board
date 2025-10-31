@@ -13,7 +13,11 @@
 		type BoardProps,
 		screenToBoardCoords,
 		boardToScreenCoords,
-		isBoardUnderEvent
+		isBoardUnderEvent,
+		setDelta,
+		viewByPinch,
+		dragDelta,
+		applyScaleBounding, isClick
 	} from '$lib/index.js';
 
 	let {
@@ -32,6 +36,8 @@
 		onPanStart = () => {},
 		onPan = () => {},
 		onPanEnd = () => {},
+		onClick = () => {},
+		clickThreshold = 5,
 		doubleTouchPan = true,
 		singleTouchPan = true,
 		mousePan = true,
@@ -39,8 +45,8 @@
 			{
 				scale: 1,
 				size: 256,
-				bg: `#111`
-			}
+				bg: `#111`,
+			},
 		],
 		bgParams = { duration: 400 },
 		board = $bindable(null),
@@ -54,7 +60,7 @@
 		touchpadMultiplier: 6,
 		stiffness: 0.15,
 		damping: 0.4,
-		...zoomDefault
+		...zoomDefault,
 	});
 
 	const { pinch, setPinch } = createPinch();
@@ -67,15 +73,12 @@
 		zoom.damping
 	);
 	const { zoomAnchor, setZoomAnchor } = createZoomAnchor();
-	export const { velocity, setVelocity, cancelVelocity, inertia, onInertia, onInertiaEnd } = createVelocity(
-		0,
-		0,
-		inertiaFriction
-	);
+	export const { velocity, setVelocity, cancelVelocity, stopVelocity, inertia, onInertia, onInertiaEnd } =
+		createVelocity(0, 0, inertiaFriction);
 
 	export const view = (): View => {
 		return { x, y, scale };
-	};
+	}
 
 	export const screenToBoard = (coords: { x: number; y: number }) =>
 		screenToBoardCoords(coords, x, y, scale);
@@ -86,6 +89,22 @@
 		if (e instanceof MouseEvent) return { x: e.clientX, y: e.clientY };
 		const touch = e.touches[0] || e.changedTouches[0];
 		return { x: touch.clientX, y: touch.clientY };
+	}
+
+	let click: {
+		start: {
+			x: number
+			y: number
+		}
+		end: {
+			x: number
+			y: number
+		}
+		event: null | MouseEvent | TouchEvent
+	} = {
+		start: { x: 0, y: 0 },
+		end: { x: 0, y: 0 },
+		event: null
 	}
 
 	onInertia(() => {
@@ -125,10 +144,7 @@
 
 		if (!isBoardUnderEvent(e, board)) return;
 
-		const deltaX =
-			(e.deltaMode === 1 ? e.deltaX : e.deltaX) * 0.12 * Math.max(1, Math.min(1.75, 1 / scale));
-		const deltaY =
-			(e.deltaMode === 1 ? e.deltaY : e.deltaY) * 0.12 * Math.max(1, Math.min(1.75, 1 / scale));
+		const delta = setDelta(e, scale);
 
 		if (e.ctrlKey || e.metaKey) {
 			const rect = board!.getBoundingClientRect();
@@ -138,49 +154,49 @@
 			setZoomAnchor({ x: mx, y: my });
 
 			const factor = Math.exp(
-				-deltaY /
-					(1 / (Math.abs(e.deltaY) < 20 ? wheel.speed * zoom.touchpadMultiplier : wheel.speed))
+				-delta.y /
+					(1 /
+						(Math.abs(e.deltaY) < 20
+							? wheel.speed * zoom.touchpadMultiplier * (e.deltaMode === 1 ? 0.25 : 1)
+							: wheel.speed * (e.deltaMode === 1 ? 0.25 : 1)))
 			);
-			const requestedFull = scale * factor;
 
-			let displayedRequested = requestedFull;
+			const displayedRequested = applyScaleBounding(
+				scale * factor,
+				scaleBounds,
+				lowerScaleRubber,
+				higherScaleRubber
+			);
 
-			if (displayedRequested < scaleBounds.min) {
-				displayedRequested =
-					scaleBounds.min + lowerScaleRubber(displayedRequested - scaleBounds.min);
-			} else if (displayedRequested > scaleBounds.max) {
-				displayedRequested =
-					scaleBounds.max + higherScaleRubber(displayedRequested - scaleBounds.max);
-			}
-
-			const prevScale = scale;
-			const deltaScale = displayedRequested - prevScale;
+			const deltaScale = displayedRequested - scale;
 			const immediateDelta = deltaScale * zoom.immediateBlend;
-			const newScale = prevScale + immediateDelta;
+			const newScale = scale + immediateDelta;
 
-			const realFactor = prevScale !== 0 ? newScale / prevScale : 1;
+			const realFactor = scale !== 0 ? newScale / scale : 1;
 
 			scale = newScale;
 			x = mx - (mx - x) * realFactor;
 			y = my - (my - y) * realFactor;
 
 			setScaling({
-				target: clamp(requestedFull, scaleBounds.min, scaleBounds.max),
-				velocity: (scaling.velocity += deltaScale * zoom.kick)
+				target: clamp(displayedRequested, scaleBounds.min, scaleBounds.max),
+				velocity: (scaling.velocity += deltaScale * zoom.kick),
 			});
 		} else {
 			const applyVelocity = (value: number, delta: number) =>
 				value * (1 - wheel.momentumFactor) + -delta * wheel.momentumFactor;
 
 			if (e.shiftKey) {
-				x -= deltaX;
-
-				velocity.x = applyVelocity(velocity.x, deltaY);
+				x -= delta.x;
+				velocity.x = applyVelocity(velocity.x, delta.y);
 			} else {
-				x -= deltaX;
-				y -= deltaY;
+				x -= delta.x;
+				y -= delta.y;
 
-				setVelocity({ x: applyVelocity(velocity.x, deltaX), y: applyVelocity(velocity.y, deltaY) });
+				setVelocity({
+					x: applyVelocity(velocity.x, delta.x),
+					y: applyVelocity(velocity.y, delta.y),
+				});
 			}
 			inertia();
 		}
@@ -189,6 +205,8 @@
 	}
 
 	function handleMouseDown(e: MouseEvent) {
+		click.start = { x: e.clientX, y: e.clientY }
+		click.event = e;
 		if (!mousePan) {
 			onPanStart(e);
 			return;
@@ -201,44 +219,40 @@
 			lastX: e.clientX,
 			lastY: e.clientY
 		});
-		setVelocity({ x: 0, y: 0 });
-		cancelVelocity();
+		onPanStart(e);
+		stopVelocity();
 		board && (board.style.cursor = 'grabbing');
-
 		onPanStart(e);
 	}
 
 	function handleMouseMove(event: MouseEvent) {
 		if (!drag.happens) return;
-
-		if (!mousePan) {
-			onPan(event);
-			return;
-		}
+		onPan(event);
+		if (!mousePan) return;
 		setVelocity({ x: event.clientX - drag.lastX, y: event.clientY - drag.lastY });
 		setDrag({ lastX: event.clientX, lastY: event.clientY });
 
 		x = event.clientX - drag.startX;
 		y = event.clientY - drag.startY;
-
-		onPan(event);
 	}
 
 	function handleMouseUp(event: MouseEvent) {
+		click.end = { x: event.clientX, y: event.clientY }
 		drag.happens = false;
 		board && (board.style.cursor = 'grab');
 		inertia();
+		if (isClick(click, clickThreshold) && click.event) onClick(click.event);
 		onPanEnd(event);
 	}
 
 	function handleTouchStart(e: TouchEvent) {
-		if (!isBoardUnderEvent(e, board)) return;
+		if (!board || !isBoardUnderEvent(e, board)) return;
+		onPanStart(e);
 
 		if (e.touches.length === 1) {
-			if (!singleTouchPan) {
-				onPanStart(e);
-				return;
-			}
+			click.start = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+			click.event = e;
+			if (!singleTouchPan) return;
 			setDrag({
 				happens: true,
 				startX: e.touches[0].clientX - x,
@@ -246,15 +260,9 @@
 				lastX: e.touches[0].clientX,
 				lastY: e.touches[0].clientY
 			});
-			setVelocity({ x: 0, y: 0 });
-			cancelVelocity();
+			stopVelocity();
 		} else if (e.touches.length === 2) {
-			if (!doubleTouchPan) {
-				onPanStart(e);
-				return;
-			}
-			if (!board) return;
-
+			if (!doubleTouchPan) return;
 			const [t1, t2] = [e.touches[0], e.touches[1]];
 			setDrag({
 				happens: false,
@@ -267,54 +275,43 @@
 
 			if (scaling.velocity < 0.0001) setZoomAnchor({ x: pinch.centerX, y: pinch.centerY });
 		}
-
-		onPanStart(e);
 	}
 
 	function handleTouchMove(e: TouchEvent) {
+		onPan(e);
 		if (e.touches.length === 1 && drag.happens) {
-			if (!singleTouchPan) {
-				onPan(e);
-				return;
-			}
+			if (!singleTouchPan) return;
 
 			const t = e.touches[0];
-			setVelocity({ x: t.clientX - drag.lastX, y: t.clientY - drag.lastY});
-			setDrag({ lastX: t.clientX, lastY: t.clientY })
+			setVelocity({ x: t.clientX - drag.lastX, y: t.clientY - drag.lastY });
+			setDrag({ lastX: t.clientX, lastY: t.clientY });
+
+			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY }
 
 			x = t.clientX - drag.startX;
 			y = t.clientY - drag.startY;
 		} else if (e.touches.length === 2) {
-			if (!doubleTouchPan) {
-				onPan(e);
-				return;
-			}
-			const t1 = e.touches[0],
-				t2 = e.touches[1];
+			if (!doubleTouchPan) return;
+			const t1 = e.touches[0];
+			const t2 = e.touches[1];
 			const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-			const zoomFactor = dist / pinch.distance;
-			let requested = pinch.scale * zoomFactor;
+			const requested = applyScaleBounding(
+				(pinch.scale * dist) / pinch.distance,
+				scaleBounds,
+				lowerScaleRubber,
+				higherScaleRubber
+			);
 
-			if (requested < scaleBounds.min) {
-				requested = scaleBounds.min + lowerScaleRubber(requested - scaleBounds.min);
-			} else if (requested > scaleBounds.max) {
-				requested = scaleBounds.max + higherScaleRubber(requested - scaleBounds.max);
-			}
+			x =
+				viewByPinch(pinch.centerX, pinch.offsetX, pinch.scale, requested) +
+				dragDelta([t1.clientX, t2.clientX], drag.startX);
+			y =
+				viewByPinch(pinch.centerY, pinch.offsetY, pinch.scale, requested) +
+				dragDelta([t1.clientY, t2.clientY], drag.startY);
 
-			const newViewX = pinch.centerX - (pinch.centerX - pinch.offsetX) * (requested / pinch.scale);
-			const newViewY = pinch.centerY - (pinch.centerY - pinch.offsetY) * (requested / pinch.scale);
-
-			const currentPinchX = (t1.clientX + t2.clientX) / 2;
-			const currentPinchY = (t1.clientY + t2.clientY) / 2;
-			const dx = currentPinchX - drag.startX;
-			const dy = currentPinchY - drag.startY;
-
-			x = newViewX + dx;
-			y = newViewY + dy;
 			scale = requested;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
 		}
-		onPan(e);
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
@@ -322,6 +319,7 @@
 			drag.happens = false;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
 			inertia();
+			if (isClick(click, clickThreshold) && click.event) onClick(click.event);
 		} else if (e.touches.length === 1) {
 			stopScaling();
 			const t = e.touches[0];
@@ -330,7 +328,7 @@
 				startX: t.clientX - x,
 				startY: t.clientY - y,
 				lastX: t.clientX,
-				lastY: t.clientY
+				lastY: t.clientY,
 			});
 		}
 		onPanEnd(e);
@@ -359,7 +357,7 @@
 
 <section bind:this={board} {...rest} oncontextmenu={(e) => e.preventDefault()}>
 	<Background scopes={bgScopes} {bgParams} {x} {y} {scale}></Background>
-	<div style="transform: translate({x}px, {y}px) scale({scale});">
+	<div style="transform: translate({x}px, {y}px) scale({scale});{scale < 1 ? ' will-change: transform' : ''}">
 		{@render children?.()}
 	</div>
 </section>
@@ -377,7 +375,6 @@
 	div {
 		position: absolute;
 		inset: 0;
-		will-change: transform;
 		transform-origin: 0 0;
 	}
 </style>

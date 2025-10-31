@@ -1,7 +1,7 @@
 {
 	"name": "svelte-infinite-board",
 	"license": "MIT",
-	"version": "0.0.4",
+	"version": "0.0.6",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -15,7 +15,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Mr1am/svelte-infinite-board.git"
+		"url": "git+https://github.com/Mr1am/svelte-infinite-board.git"
 	},
 	"bugs": {
 		"url": "https://github.com/Mr1am/svelte-infinite-board/issues"
