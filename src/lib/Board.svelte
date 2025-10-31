@@ -294,17 +294,15 @@
 			if (!doubleTouchPan) {
 				return;
 			}
-			const t1 = e.touches[0],
-				t2 = e.touches[1];
+			const t1 = e.touches[0];
+			const t2 = e.touches[1];
 			const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-			const zoomFactor = dist / pinch.distance;
-			let requested = pinch.scale * zoomFactor;
-
-			if (requested < scaleBounds.min) {
-				requested = scaleBounds.min + lowerScaleRubber(requested - scaleBounds.min);
-			} else if (requested > scaleBounds.max) {
-				requested = scaleBounds.max + higherScaleRubber(requested - scaleBounds.max);
-			}
+			const requested = applyScaleBounding(
+				pinch.scale * (dist / pinch.distance),
+				scaleBounds,
+				lowerScaleRubber,
+				higherScaleRubber
+			);
 
 			const newViewX = pinch.centerX - (pinch.centerX - pinch.offsetX) * (requested / pinch.scale);
 			const newViewY = pinch.centerY - (pinch.centerY - pinch.offsetY) * (requested / pinch.scale);
