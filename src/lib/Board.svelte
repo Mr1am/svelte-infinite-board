@@ -291,24 +291,31 @@
 			x = t.clientX - drag.startX;
 			y = t.clientY - drag.startY;
 		} else if (e.touches.length === 2) {
-			if (!doubleTouchPan) return;
-			const t1 = e.touches[0];
-			const t2 = e.touches[1];
+			if (!doubleTouchPan) {
+				return;
+			}
+			const t1 = e.touches[0],
+				t2 = e.touches[1];
 			const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-			const requested = applyScaleBounding(
-				(pinch.scale * dist) / pinch.distance,
-				scaleBounds,
-				lowerScaleRubber,
-				higherScaleRubber
-			);
+			const zoomFactor = dist / pinch.distance;
+			let requested = pinch.scale * zoomFactor;
 
-			x =
-				viewByPinch(pinch.centerX, pinch.offsetX, pinch.scale, requested) +
-				dragDelta([t1.clientX, t2.clientX], drag.startX);
-			y =
-				viewByPinch(pinch.centerY, pinch.offsetY, pinch.scale, requested) +
-				dragDelta([t1.clientY, t2.clientY], drag.startY);
+			if (requested < scaleBounds.min) {
+				requested = scaleBounds.min + lowerScaleRubber(requested - scaleBounds.min);
+			} else if (requested > scaleBounds.max) {
+				requested = scaleBounds.max + higherScaleRubber(requested - scaleBounds.max);
+			}
 
+			const newViewX = pinch.centerX - (pinch.centerX - pinch.offsetX) * (requested / pinch.scale);
+			const newViewY = pinch.centerY - (pinch.centerY - pinch.offsetY) * (requested / pinch.scale);
+
+			const currentPinchX = (t1.clientX + t2.clientX) / 2;
+			const currentPinchY = (t1.clientY + t2.clientY) / 2;
+			const dx = currentPinchX - drag.startX;
+			const dy = currentPinchY - drag.startY;
+
+			x = newViewX + dx;
+			y = newViewY + dy;
 			scale = requested;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
 		}
