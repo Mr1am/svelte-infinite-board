@@ -107,6 +107,8 @@
 		event: null
 	}
 
+	let willChange = $state(true); // willChange blurs board context, so we need to turn it off sometimes
+
 	onInertia(() => {
 		x += velocity.x;
 		y += velocity.y;
@@ -122,6 +124,8 @@
 		x = zoomAnchor.x - (zoomAnchor.x - x) * factor;
 		y = zoomAnchor.y - (zoomAnchor.y - y) * factor;
 		scale = nextScale;
+		const fixed = Number(scale.toFixed(2)) * 10;
+		willChange = !(scale > 1 && Math.abs(fixed - Math.round(fixed)) < 1e-8);
 	});
 
 	onScaleEnd(() => {
@@ -211,7 +215,6 @@
 			onPanStart(e);
 			return;
 		}
-		if (!isBoardUnderEvent(e, board)) return;
 		setDrag({
 			happens: true,
 			startX: e.clientX - x,
@@ -246,11 +249,11 @@
 	}
 
 	function handleTouchStart(e: TouchEvent) {
-		if (!board || !isBoardUnderEvent(e, board)) return;
 		onPanStart(e);
 
 		if (e.touches.length === 1) {
 			click.start = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY }
 			click.event = e;
 			if (!singleTouchPan) return;
 			setDrag({
@@ -341,28 +344,25 @@
 
 	$effect(() => {
 		window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-		window.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
 		window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
 
 		return () => {
 			window.removeEventListener('wheel', handleWheel, { capture: true } as any);
-			window.removeEventListener('touchstart', handleTouchStart, { capture: true } as any);
 			window.removeEventListener('touchmove', handleTouchMove, { capture: true } as any);
 		};
 	});
 </script>
 
 <svelte:body
-	onmousedown={handleMouseDown}
 	onmousemove={handleMouseMove}
 	onmouseup={handleMouseUp}
 	ontouchend={handleTouchEnd}
 	ontouchcancel={handleTouchEnd}
 />
 
-<section bind:this={board} {...rest} oncontextmenu={(e) => e.preventDefault()}>
+<section bind:this={board} {...rest} oncontextmenu={(e) => e.preventDefault()} onmousedown={handleMouseDown} ontouchstart={handleTouchStart}>
 	<Background scopes={bgScopes} {bgParams} {x} {y} {scale}></Background>
-	<div style="transform: translate({x}px, {y}px) scale({scale});{scale < 1 ? ' will-change: transform' : ''}">
+	<div style="transform: translate({x}px, {y}px) scale({scale});{willChange ? ' will-change: transform' : ''}">
 		{@render children?.()}
 	</div>
 </section>

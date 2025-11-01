@@ -158,7 +158,7 @@
 		onPanStart={handlePanStart}
 		onPan={handlePan}
 		onPanEnd={handlePanEnd}
-		onClick={(e) => console.log(getElementsUnderEvent(e)[0].getAttribute('data-id'))}
+		onClick={(e) => console.log(e)}
 		onWheel={() => (lastEvent = 'onWheel')}
 		bind:x={x}
 		bind:y={y}
@@ -216,6 +216,7 @@
 				pushHistory={(nodes) => applySelection(nodes)}
 			/>
 	</Board>
+	<div style="position: fixed; top: 20px; left: 20px; width: 500px; height: 100px; background: #1a1a1a"></div>
 	<Selection
 		board={b}
 		bind:selecting
