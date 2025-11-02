@@ -237,8 +237,8 @@
 	}
 
 	function handleMouseMove(event: MouseEvent) {
-		if (!drag.happens) return;
 		onPan(event);
+		if (!drag.happens) return;
 		if (!mousePan) return;
 		setVelocity({ x: event.clientX - drag.lastX, y: event.clientY - drag.lastY });
 		setDrag({ lastX: event.clientX, lastY: event.clientY });

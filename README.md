@@ -21,7 +21,6 @@
 
 - [ ] Documentation
 - [ ] Board borders
-- [ ] Code split & cleanup
 
 ### Install
 
