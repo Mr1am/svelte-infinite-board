@@ -17,7 +17,8 @@
 		setDelta,
 		viewByPinch,
 		dragDelta,
-		applyScaleBounding, isClick
+		applyScaleBounding,
+		isClick
 	} from '$lib/index.js';
 
 	let {
@@ -45,8 +46,8 @@
 			{
 				scale: 1,
 				size: 256,
-				bg: `#111`,
-			},
+				bg: `#111`
+			}
 		],
 		bgParams = { duration: 400 },
 		board = $bindable(null),
@@ -60,12 +61,12 @@
 		touchpadMultiplier: 6,
 		stiffness: 0.15,
 		damping: 0.4,
-		...zoomDefault,
+		...zoomDefault
 	});
 
 	const { pinch, setPinch } = createPinch();
 	const { drag, setDrag } = createDrag();
-	export const { scaling, setScaling, stopScaling, onScale, onScaleEnd } = createScaling(
+	export const { scaling, setScaling, stopScaling, onScale, scaleSpring, onScaleEnd } = createScaling(
 		scale,
 		0,
 		0,
@@ -73,12 +74,19 @@
 		zoom.damping
 	);
 	const { zoomAnchor, setZoomAnchor } = createZoomAnchor();
-	export const { velocity, setVelocity, cancelVelocity, stopVelocity, inertia, onInertia, onInertiaEnd } =
-		createVelocity(0, 0, inertiaFriction);
+	export const {
+		velocity,
+		setVelocity,
+		cancelVelocity,
+		stopVelocity,
+		inertia,
+		onInertia,
+		onInertiaEnd
+	} = createVelocity(0, 0, inertiaFriction);
 
 	export const view = (): View => {
 		return { x, y, scale };
-	}
+	};
 
 	export const screenToBoard = (coords: { x: number; y: number }) =>
 		screenToBoardCoords(coords, x, y, scale);
@@ -93,19 +101,19 @@
 
 	let click: {
 		start: {
-			x: number
-			y: number
-		}
+			x: number;
+			y: number;
+		};
 		end: {
-			x: number
-			y: number
-		}
-		event: null | MouseEvent | TouchEvent
+			x: number;
+			y: number;
+		};
+		event: null | MouseEvent | TouchEvent;
 	} = {
 		start: { x: 0, y: 0 },
 		end: { x: 0, y: 0 },
 		event: null
-	}
+	};
 
 	let willChange = $state(true); // willChange blurs board context, so we need to turn it off sometimes
 
@@ -134,6 +142,8 @@
 		y = zoomAnchor.y - (zoomAnchor.y - y) * finalFactor;
 
 		onScaleEnds(scale);
+
+		if (!willChange) willChange = true;
 	});
 
 	let scaleBounds = $derived({ min: 0.25, max: 3, ...scaleBoundsDefault });
@@ -184,7 +194,7 @@
 
 			setScaling({
 				target: clamp(displayedRequested, scaleBounds.min, scaleBounds.max),
-				velocity: (scaling.velocity += deltaScale * zoom.kick),
+				velocity: (scaling.velocity += deltaScale * zoom.kick)
 			});
 		} else {
 			const applyVelocity = (value: number, delta: number) =>
@@ -199,22 +209,22 @@
 
 				setVelocity({
 					x: applyVelocity(velocity.x, delta.x),
-					y: applyVelocity(velocity.y, delta.y),
+					y: applyVelocity(velocity.y, delta.y)
 				});
 			}
 			inertia();
 		}
 
+		scaleSpring();
 		onWheel(e);
 	}
 
 	function handleMouseDown(e: MouseEvent) {
-		click.start = { x: e.clientX, y: e.clientY }
+		click.start = { x: e.clientX, y: e.clientY };
+		onPanStart(e);
 		click.event = e;
-		if (!mousePan) {
-			onPanStart(e);
-			return;
-		}
+		if (!mousePan) return;
+
 		setDrag({
 			happens: true,
 			startX: e.clientX - x,
@@ -222,10 +232,8 @@
 			lastX: e.clientX,
 			lastY: e.clientY
 		});
-		onPanStart(e);
 		stopVelocity();
 		board && (board.style.cursor = 'grabbing');
-		onPanStart(e);
 	}
 
 	function handleMouseMove(event: MouseEvent) {
@@ -240,7 +248,7 @@
 	}
 
 	function handleMouseUp(event: MouseEvent) {
-		click.end = { x: event.clientX, y: event.clientY }
+		click.end = { x: event.clientX, y: event.clientY };
 		drag.happens = false;
 		board && (board.style.cursor = 'grab');
 		inertia();
@@ -252,8 +260,8 @@
 		onPanStart(e);
 
 		if (e.touches.length === 1) {
-			click.start = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+			click.start = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 			click.event = e;
 			if (!singleTouchPan) return;
 			setDrag({
@@ -283,17 +291,17 @@
 	function handleTouchMove(e: TouchEvent) {
 		onPan(e);
 		if (e.touches.length === 1 && drag.happens) {
+			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 			if (!singleTouchPan) return;
 
 			const t = e.touches[0];
 			setVelocity({ x: t.clientX - drag.lastX, y: t.clientY - drag.lastY });
 			setDrag({ lastX: t.clientX, lastY: t.clientY });
 
-			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-
 			x = t.clientX - drag.startX;
 			y = t.clientY - drag.startY;
 		} else if (e.touches.length === 2) {
+			click.event = null;
 			if (!doubleTouchPan) {
 				return;
 			}
@@ -326,6 +334,7 @@
 		if (e.touches.length === 0) {
 			drag.happens = false;
 			scaling.target = clamp(scale, scaleBounds.min, scaleBounds.max);
+			scaleSpring();
 			inertia();
 			if (isClick(click, clickThreshold) && click.event) onClick(click.event);
 		} else if (e.touches.length === 1) {
@@ -336,7 +345,7 @@
 				startX: t.clientX - x,
 				startY: t.clientY - y,
 				lastX: t.clientX,
-				lastY: t.clientY,
+				lastY: t.clientY
 			});
 		}
 		onPanEnd(e);
@@ -360,9 +369,19 @@
 	ontouchcancel={handleTouchEnd}
 />
 
-<section bind:this={board} {...rest} oncontextmenu={(e) => e.preventDefault()} onmousedown={handleMouseDown} ontouchstart={handleTouchStart}>
+<section
+	bind:this={board}
+	{...rest}
+	oncontextmenu={(e) => e.preventDefault()}
+	onmousedown={handleMouseDown}
+	ontouchstart={handleTouchStart}
+>
 	<Background scopes={bgScopes} {bgParams} {x} {y} {scale}></Background>
-	<div style="transform: translate({x}px, {y}px) scale({scale});{willChange ? ' will-change: transform' : ''}">
+	<div
+		style="transform: translate({x}px, {y}px) scale({scale});{willChange
+			? ' will-change: transform'
+			: ''}"
+	>
 		{@render children?.()}
 	</div>
 </section>

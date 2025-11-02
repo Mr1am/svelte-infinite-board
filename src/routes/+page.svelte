@@ -30,7 +30,7 @@
 		{ id: '1', x: 100, y: 100, w: 80, h: 60 },
 		{ id: '2', x: 250, y: 150, w: 100, h: 80 },
 		{ id: '3', x: 400, y: 300, w: 120, h: 40 },
-		{ id: '4', x: 50, y: 400, w: 60, h: 60 },
+		{ id: '4', x: 50, y: 400, w: 60, h: 60 }
 	]);
 
 	let selecting = $state(false);
@@ -39,9 +39,7 @@
 		end: { x: 0, y: 0 }
 	});
 
-	function getElementsUnderEvent(
-		event: MouseEvent | TouchEvent
-	): HTMLElement[] {
+	function getElementsUnderEvent(event: MouseEvent | TouchEvent): HTMLElement[] {
 		if (typeof document === 'undefined') return [];
 
 		let x: number, y: number;
@@ -68,7 +66,8 @@
 		if (e.button === 2) {
 			e.preventDefault();
 			sel.enter(e);
-		} if (e.touches?.length === 1) {
+		}
+		if (e.touches?.length === 1) {
 			longTapTimeout = setTimeout(() => {
 				sel.enter(e);
 			}, longTapDuration) as any;
@@ -110,21 +109,17 @@
 
 		if (!isTouch && isCtrl) {
 			newSelected = selectedNodes.includes(node)
-				? selectedNodes.filter(n => n !== node)
+				? selectedNodes.filter((n) => n !== node)
 				: [...selectedNodes, node];
-		}
-		else if (isTouch && selectedNodes.length > 1) {
+		} else if (isTouch && selectedNodes.length > 1) {
 			newSelected = selectedNodes.includes(node)
-				? selectedNodes.filter(n => n !== node)
+				? selectedNodes.filter((n) => n !== node)
 				: [...selectedNodes, node];
-		}
-		else if (isTouch && selectedNodes.length === 1 && selectedNodes[0] !== node) {
+		} else if (isTouch && selectedNodes.length === 1 && selectedNodes[0] !== node) {
 			newSelected = [node];
-		}
-		else if (!isTouch && selectedNodes.includes(node) && selectedNodes.length > 1) {
-			newSelected = selectedNodes.filter(n => n !== node);
-		}
-		else {
+		} else if (!isTouch && selectedNodes.includes(node) && selectedNodes.length > 1) {
+			newSelected = selectedNodes.filter((n) => n !== node);
+		} else {
 			newSelected = [node];
 		}
 
@@ -151,8 +146,8 @@
 
 <section role="none" style="width: 100vw; height: 100dvh" oncontextmenu={handleContextMenu}>
 	<Board
-		bind:scale={scale}
-		mousePan={!selecting}
+		bind:scale
+		{mousePan}
 		singleTouchPan={!selecting}
 		{doubleTouchPan}
 		onPanStart={handlePanStart}
@@ -160,10 +155,10 @@
 		onPanEnd={handlePanEnd}
 		onClick={(e) => console.log(e)}
 		onWheel={() => (lastEvent = 'onWheel')}
-		bind:x={x}
-		bind:y={y}
+		bind:x
+		bind:y
 		bind:this={b}
-		bind:board={board}
+		bind:board
 		scaleBounds={{ min: 0.5, max: 3 }}
 		bgScopes={[
 			{
@@ -174,14 +169,13 @@
 		]}
 	>
 		<h1 style="position: absolute; left: {coords.x}px; top: {coords.y}px">
-			x {x.toFixed(2)},
-			y {y.toFixed(2)}
+			x {x.toFixed(2)}, y {y.toFixed(2)}
 		</h1>
 		<div style="display: flex; flex-direction: column; align-items: start; gap: 0.5rem;">
 			<p>Last event: {lastEvent}</p>
-			<label><input type="checkbox" bind:checked={singleTouchPan}> singleTouchPan</label>
-			<label><input type="checkbox" bind:checked={doubleTouchPan}> doubleTouchPan</label>
-			<label><input type="checkbox" bind:checked={mousePan}> mousePan</label>
+			<label><input type="checkbox" bind:checked={singleTouchPan} /> singleTouchPan</label>
+			<label><input type="checkbox" bind:checked={doubleTouchPan} /> doubleTouchPan</label>
+			<label><input type="checkbox" bind:checked={mousePan} /> mousePan</label>
 		</div>
 		{#each nodes as node}
 			<div
@@ -207,16 +201,18 @@
 				{node.id}
 			</div>
 		{/each}
-			<SelectionRange
-				{selection}
-				{nodes}
-				board={b}
-				mode="partial"
-				bind:selectedNodes
-				pushHistory={(nodes) => applySelection(nodes)}
-			/>
+		<SelectionRange
+			{selection}
+			{nodes}
+			board={b}
+			mode="partial"
+			bind:selectedNodes
+			pushHistory={(nodes) => applySelection(nodes)}
+		/>
 	</Board>
-	<div style="position: fixed; top: 20px; left: 20px; width: 500px; height: 100px; background: #1a1a1a"></div>
+	<div
+		style="position: fixed; top: 20px; left: 20px; width: 500px; height: 100px; background: #1a1a1a"
+	></div>
 	<Selection
 		board={b}
 		bind:selecting

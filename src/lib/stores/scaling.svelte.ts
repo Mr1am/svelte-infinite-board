@@ -14,7 +14,7 @@ export function createScaling(
 		Object.assign(scaling, values);
 	};
 
-	function startScaleSpring() {
+	function scaleSpring() {
 		if (scaling.frame) cancelAnimationFrame(scaling.frame);
 
 		function step() {
@@ -36,13 +36,6 @@ export function createScaling(
 		scaling.frame = requestAnimationFrame(step);
 	}
 
-	$effect(() => {
-		const hasDiff = Math.abs(scaling.target - scaling.current) > 0.0001;
-		const hasVelocity = Math.abs(scaling.velocity) > 0.0001;
-
-		if ((hasDiff || hasVelocity) && !scaling.frame) startScaleSpring();
-	});
-
 	const stopScaling = () => {
 		if (scaling.frame) {
 			cancelAnimationFrame(scaling.frame);
@@ -57,6 +50,7 @@ export function createScaling(
 		scaling,
 		setScaling,
 		stopScaling,
+		scaleSpring,
 		onScale(cb: (scale: Scaling) => void) {
 			onScaleCallback = cb;
 			return this;
