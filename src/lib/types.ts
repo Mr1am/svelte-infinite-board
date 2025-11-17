@@ -52,140 +52,6 @@ export interface Velocity {
 	y: number;
 }
 
-/**
- * Base interface for nodes in the system, defining core positional and dimensional properties.
- * This is an initial definition; it may be extended or overridden in subsequent declarations.
- *
- * @interface Node
- * @property {number} x - The x-coordinate position of the node.
- * @property {number} y - The y-coordinate position of the node.
- * @property {number} w - The width of the node.
- * @property {number} h - The height of the node.
- * @property {string} id - Unique identifier for the node.
- * @property {number} z - Z-index for layering and stacking order.
- */
-export interface Node {
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	id: string;
-	z: number;
-}
-
-
-export type NodeType = 'textable' | 'sketch' | 'group';
-
-/**
- * Extended base interface for nodes, including type, optional locking, and visibility.
- * This overrides or extends the previous Node interface.
- *
- * @interface Node
- * @property {string} id - Unique identifier for the node.
- * @property {NodeType} type - The type of the node (textable, sketch, or group).
- * @property {number} x - The x-coordinate position of the node.
- * @property {number} y - The y-coordinate position of the node.
- * @property {number} w - The width of the node.
- * @property {number} h - The height of the node.
- * @property {number} z - Z-index for layering and stacking order.
- * @property {boolean} [locked] - Whether the node is locked (preventing edits or moves).
- * @property {boolean} [visible] - Whether the node is visible.
- */
-export interface Node {
-	id: string;
-	type: NodeType;
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	z: number;
-	locked?: boolean;
-	visible?: boolean;
-}
-
-/**
- * Interface for textable nodes, extending the base Node with text content and styling.
- *
- * @interface Textable
- * @extends Node
- * @property {'textable'} type - Specifies this is a textable node.
- * @property {Group} [group] - Optional reference to a parent group.
- * @property {string} content - The text content of the node.
- * @property {object} styles - Styling options for the textable node.
- * @property {string} styles.bg - Background color.
- * @property {string} styles.fg - Foreground (text) color.
- * @property {object} styles.outline - Outline styling.
- * @property {string} styles.outline.color - Color of the outline.
- * @property {number} styles.outline.width - Width of the outline.
- */
-export interface Textable extends Node {
-	type: 'textable';
-	group?: Group;
-	content: string;
-	styles: {
-		bg: string;
-		fg: string;
-		outline: {
-			color: string;
-			width: number;
-		};
-	};
-}
-
-/**
- * Interface for sketch nodes, extending the base Node with path data and brush styling.
- *
- * @interface Sketch
- * @extends Node
- * @property {'sketch'} type - Specifies this is a sketch node.
- * @property {Group} [group] - Optional reference to a parent group.
- * @property {string} path - SVG path string representing the sketch.
- * @property {object} styles - Styling options for the sketch.
- * @property {string} styles.color - Stroke color.
- * @property {number} styles.width - Stroke width.
- * @property {'pen' | 'marker' | 'pencil'} styles.brush - Type of brush used for the sketch.
- */
-export interface Sketch extends Node {
-	type: 'sketch';
-	group?: Group;
-	path: string;
-	styles: {
-		color: string;
-		width: number;
-		brush: 'pen' | 'marker' | 'pencil';
-	};
-}
-
-/**
- * Interface for group nodes, extending the base Node with title, children, and styling.
- *
- * @interface Group
- * @extends Node
- * @property {'group'} type - Specifies this is a group node.
- * @property {string} title - Title or label for the group.
- * @property {Node[]} children - Array of child nodes within the group.
- * @property {object} styles - Styling options for the group.
- * @property {string} styles.bg - Background color.
- * @property {string} styles.fg - Foreground color.
- * @property {object} styles.outline - Outline styling.
- * @property {string} styles.outline.color - Color of the outline.
- * @property {number} styles.outline.width - Width of the outline.
- */
-export interface Group extends Node {
-	type: 'group';
-	title: string;
-	children: Node[];
-	styles: {
-		bg: string;
-		fg: string;
-		outline: {
-			color: string;
-			width: number;
-		};
-	};
-}
-
-export type NodeUnion = Textable | Sketch | Group;
 
 /**
  * State for drag operations, tracking if a drag is occurring and positions.
@@ -311,6 +177,8 @@ export interface BoardProps {
 	onPanEnd?: (e?: MouseEvent | TouchEvent) => any;
 	onClick?: (e: MouseEvent | TouchEvent) => any;
 	clickThreshold?: number;
+	onMove?: (e: MouseEvent | TouchEvent) => any;
+	onClickDown?: (e: MouseEvent | TouchEvent) => any;
 	mousePan?: boolean;
 	singleTouchPan?: boolean;
 	doubleTouchPan?: boolean;

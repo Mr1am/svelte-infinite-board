@@ -30,14 +30,14 @@
 		if (!currentScope.bg) return '';
 		if (currentScope.bg.startsWith('<svg')) return `background-image: ${svgToUri(currentScope.bg)}`;
 		return `background-color: ${currentScope.bg}`;
-	})
+	});
 	const bgSize = $derived(scale * (currentScope.size ?? 128));
 </script>
 
 {#key currentScope}
 	<div
 		transition:fade={bgParams}
-		style='background-size: {bgSize}px; background-position: {x}px {y}px; {bgPattern}'
+		style="background-size: {bgSize}px; background-position: {x}px {y}px; {bgPattern}"
 		aria-hidden="true"
 		{...rest}
 	></div>
