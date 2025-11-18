@@ -237,8 +237,8 @@
 	}
 
 	function handleMouseMove(event: MouseEvent) {
-		if (!drag.happens) return;
 		onPan(event);
+		if (!drag.happens) return;
 		if (!mousePan) return;
 		setVelocity({ x: event.clientX - drag.lastX, y: event.clientY - drag.lastY });
 		setDrag({ lastX: event.clientX, lastY: event.clientY });
@@ -274,6 +274,7 @@
 			stopVelocity();
 		} else if (e.touches.length === 2) {
 			if (!doubleTouchPan) return;
+			click.event = null;
 			const [t1, t2] = [e.touches[0], e.touches[1]];
 			setDrag({
 				happens: false,
@@ -290,9 +291,9 @@
 
 	function handleTouchMove(e: TouchEvent) {
 		onPan(e);
-		if (e.touches.length === 1 && drag.happens) {
+		if (e.touches.length === 1) {
 			click.end = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-			if (!singleTouchPan) return;
+			if (!singleTouchPan || !drag.happens) return;
 
 			const t = e.touches[0];
 			setVelocity({ x: t.clientX - drag.lastX, y: t.clientY - drag.lastY });

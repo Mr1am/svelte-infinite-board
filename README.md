@@ -12,16 +12,14 @@
 - lightweight
 - customization
 
-### New in 0.0.4
-- board binding
-- events now trigger even when pan disabled
-- screenToBoard & boardToScreen convert functions
+### New in 0.0.12
+- fixed onClick event
 
 ### Roadmap
 
 - [ ] Documentation
 - [ ] Board borders
-- [ ] Code split & cleanup
+- [ ] API
 
 ### Install
 
