@@ -148,7 +148,7 @@
 	<Board
 		bind:scale
 		{mousePan}
-		singleTouchPan={singleTouchPan}
+		singleTouchPan={!selecting}
 		{doubleTouchPan}
 		onPanStart={handlePanStart}
 		onPan={handlePan}
