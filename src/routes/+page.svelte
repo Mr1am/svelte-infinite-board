@@ -14,7 +14,7 @@
 
 	let singleTouchPan = $state(true);
 	let doubleTouchPan = $state(true);
-	let mousePan = $state(true);
+	let mousePan = $state(false);
 	let coords = $state({ x: 0, y: 0 });
 
 	let longTapTimeout = $state<number | null>(null);

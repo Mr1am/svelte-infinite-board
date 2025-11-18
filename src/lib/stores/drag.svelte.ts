@@ -7,11 +7,9 @@ export function createDrag(initial?: Partial<Drag>) {
 		startY: 0,
 		lastX: 0,
 		lastY: 0
-	}
+	};
 	const setDrag = (values: Partial<Drag>) => {
-		for (const key in values) {
-			if (key in drag) (drag as any)[key] = values[key as keyof Drag];
-		}
+		Object.assign(drag, values);
 	};
 
 	const drag: Drag = $state({ ...defaults, ...(initial ?? {}) });

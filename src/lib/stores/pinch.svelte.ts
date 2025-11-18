@@ -11,9 +11,7 @@ export function createPinch(initial?: Partial<Pinch>) {
 	};
 
 	const setPinch = (values: Partial<Pinch>) => {
-		for (const key in values) {
-			if (key in pinch) (pinch as any)[key] = values[key as keyof Pinch];
-		}
+		Object.assign(pinch, values);
 	};
 
 	const pinch: Pinch = $state({ ...defaults, ...(initial ?? {}) });
